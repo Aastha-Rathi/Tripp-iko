@@ -1,9 +1,8 @@
 const User = require('../models/User');
 
-// Update user profile (after login)
 exports.updateProfile = async (req, res) => {
   try {
-    const userId = req.user.id; // from jwtMiddleware
+    const userId = req.user.id;
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: req.body },
@@ -15,37 +14,58 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-
-// Get current user profile
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id); // from jwtMiddleware
+    const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.status(200).json(user);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching profile', error: err });
   }
 };
-// ✅ New: Add Travel Plan
+
 exports.addTravelPlan = async (req, res) => {
   try {
-    const { destination, from, to, description } = req.body;
+    const {
+      name,
+      bio,
+      travelerType,
+      interests,
+      preferredDestinations,
+      travelDates
+    } = req.body;
+    
     const user = await User.findById(req.user.id);
-
-    user.travelPlans.push({ destination, from, to, description });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (req.file) {
+      user.profilePic = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    }
+    if (name) user.name = name;
+    if (bio) user.bio = bio;
+    if (travelerType) user.travelerType = travelerType;
+    if (interests) user.interests = interests;
+    if (preferredDestinations) user.preferredDestinations = preferredDestinations;
+    if (travelDates && travelDates.from && travelDates.to) {
+      user.travelDates = {
+        from: new Date(travelDates.from),
+        to: new Date(travelDates.to)
+      };
+    }
     await user.save();
-
-    res.status(200).json({ message: 'Travel plan added', user });
+    res.status(200).json({
+      message: 'Travel plan and profile updated',
+      user
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Error adding travel plan', error: err.message });
+    res.status(500).json({ message: 'Error updating travel plan/profile', error: err.message });
   }
 };
 
-// ✅ New: Search by Destination
 exports.searchByDestination = async (req, res) => {
   try {
     const { destination } = req.query;
-
     const users = await User.find({
       'travelPlans.destination': { $regex: destination, $options: 'i' }
     }).select('username name bio profilePic travelPlans');
